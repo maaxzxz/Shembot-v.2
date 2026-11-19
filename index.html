@@ -3,246 +3,241 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#eef5fb" />
+    <meta name="theme-color" content="#0d0d0f" />
     <meta name="description" content="Private, on-device people counting from your phone or laptop camera." />
-    <title>Phone Crowd Counter</title>
-    <link rel="stylesheet" href="./styles.css?v=20261119-crowd1" />
-    <script defer src="./boot.js?v=20261119-person-fix4"></script>
+    <title>Shembot Vision Console</title>
+    <link rel="stylesheet" href="./assets/css/styles.css?v=20261119-console1" />
+    <script defer src="./src/js/boot.js?v=20261119-console2"></script>
   </head>
   <body>
-    <main class="app-frame">
-      <aside class="sidebar" aria-label="Application navigation">
-        <div class="brand-mark" aria-label="Crowd Counter home">
-          <span></span><span></span><span></span>
-        </div>
-
-        <nav class="sidebar-nav" aria-label="Main navigation">
-          <a class="nav-button is-active" href="#overview" aria-current="page" aria-label="Overview">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h7V4H4v9Zm0 7h7v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z" /></svg>
-          </a>
-          <a class="nav-button" href="#live-camera" aria-label="Live camera">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8.5 19.5 6v12L15 15.5V18H3V6h12v2.5Zm-2-.5H5v8h8V8Z" /></svg>
-          </a>
-          <a class="nav-button" href="#settings" aria-label="Room settings">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10h3v10H5Zm6 0V4h3v16h-3Zm6 0v-7h3v7h-3Z" /></svg>
-          </a>
-          <a class="nav-button" href="#privacy" aria-label="Privacy information">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3.2 5 1.9V11c0 3.5-2.1 6.7-5 7.8C9.1 17.7 7 14.5 7 11V7.1l5-1.9Z" /></svg>
-          </a>
-        </nav>
-
-        <div class="sidebar-status" title="Detection runs on this device">
-          <span></span>
-          <small>LOCAL</small>
-        </div>
-      </aside>
-
-      <div class="workspace" id="overview">
-        <header class="dashboard-header">
-          <div>
-            <p class="page-kicker">COMPUTER VISION PROJECT</p>
-            <h1>Overview</h1>
-            <p class="page-subtitle">Live, private people monitoring from any camera.</p>
+    <main class="app-shell">
+      <section class="viewport-panel" id="overview" aria-label="Live camera workspace">
+        <header class="viewport-header">
+          <div class="workspace-title">
+            <span class="eyebrow">LIVE WORKSPACE</span>
+            <h1>Camera monitor</h1>
           </div>
-          <div class="device-chip" title="Video is processed in this browser">
-            <span class="device-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 3v12h8V5H8Zm3 14v1h2v-1h-2Z" /></svg>
-            </span>
-            <span>
-              <strong>On-device</strong>
-              <small>Private processing</small>
-            </span>
-            <i aria-hidden="true"></i>
+
+          <div class="metric-strip" aria-label="Live detection summary">
+            <div class="metric metric-primary">
+              <span>People</span>
+              <strong id="countValue" aria-live="polite">0</strong>
+            </div>
+            <div class="metric metric-status">
+              <span>Room status</span>
+              <strong id="capacityStatus" aria-live="polite">CAPACITY OK</strong>
+            </div>
+            <div class="metric">
+              <span>Performance</span>
+              <strong><span id="fpsValue">0.0</span> FPS</strong>
+            </div>
           </div>
         </header>
 
-        <section class="stat-grid" aria-label="Live detection summary">
-          <article class="stat-card stat-card-blue">
-            <div class="stat-copy"><span>People detected</span><strong id="countValue" aria-live="polite">0</strong></div>
-            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3ZM8 11c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3Zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13Zm8 0c-.3 0-.7 0-1.1.1 1.2.9 2.1 2 2.1 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5Z" /></svg></span>
-            <span class="stat-note">Live count</span>
-          </article>
-
-          <article class="stat-card stat-card-green">
-            <div class="stat-copy"><span>Safe capacity</span><output id="capacityOutput" for="capacityInput">10 people</output></div>
-            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11h-6v-7h-4v7H4Zm2-2h2v-7h8v7h2v-8l-6-4.5L6 11v8Z" /></svg></span>
-            <span class="stat-note">Room limit</span>
-          </article>
-
-          <article class="stat-card stat-card-yellow">
-            <div class="stat-copy"><span>Room status</span><strong class="status-value" id="capacityStatus" aria-live="polite">CAPACITY OK</strong></div>
-            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9.6 16.2-4.2-4.1L4 13.5l5.6 5.6L20.5 8.2 19.1 6.8 9.6 16.2Z" /></svg></span>
-            <span class="stat-note">Automatic alert</span>
-          </article>
-
-          <article class="stat-card stat-card-purple">
-            <div class="stat-copy"><span>Detection speed</span><strong><span id="fpsValue">0.0</span> <small>FPS</small></strong></div>
-            <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2a9 9 0 1 0 8.5 6h-2.2A7 7 0 1 1 13 4v4l5-5-5-5v4Zm-2 5h2v6l4 2-.9 1.8-5.1-2.7V7Z" /></svg></span>
-            <span class="stat-note">Device performance</span>
-          </article>
-        </section>
-
-        <div class="content-grid">
+        <div class="camera-zone">
           <section class="camera-card" id="cameraCard" aria-label="Camera and detection preview">
-            <div class="panel-heading" id="live-camera">
-              <div><p class="section-kicker">LIVE MONITOR</p><h2>Camera feed</h2></div>
-              <span class="auto-badge"><i></i> Automatic verification</span>
-            </div>
-
             <div class="camera-stage" id="cameraStage">
               <video id="camera" autoplay muted playsinline></video>
               <canvas id="overlay" aria-hidden="true"></canvas>
+
               <div class="zone-selection" id="zoneSelection" hidden>
                 <span>Drag around the area where people stay</span>
                 <div class="zone-draft" id="zoneDraft" hidden></div>
               </div>
 
               <div class="empty-state" id="emptyState">
-                <div class="lens-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 4 7.2 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.2L15 4H9Zm3 13a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /></svg></div>
-                <h2>Start live detection</h2>
-                <p>Use the rear camera, keep the lens clear, and include each person's upper body.</p>
+                <span class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M9 4 7.2 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.2L15 4H9Zm3 13a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /></svg>
+                </span>
+                <span class="eyebrow">ON-DEVICE VISION</span>
+                <h2>Camera is standing by</h2>
+                <p>Start the camera to count people privately in this browser.</p>
               </div>
 
               <div class="hud" id="hud" hidden>
                 <span class="live-indicator"><i></i> LIVE</span>
-                <span class="hud-mode">PERSON ONLY</span>
+                <span class="hud-mode">PERSON DETECTION</span>
               </div>
 
               <div class="model-loading" id="modelLoading" role="status">
                 <span class="spinner"></span>
-                <span id="modelStatus">Preparing person detector…</span>
+                <span id="modelStatus">Preparing person detector...</span>
               </div>
             </div>
 
-            <div class="primary-actions">
-              <button class="primary-button" id="startButton" disabled><span class="button-icon">●</span> Start camera</button>
+            <div class="viewport-actions">
+              <button class="primary-button" id="startButton" disabled>
+                <span class="button-icon">&#9679;</span> Start camera
+              </button>
               <button class="icon-button" id="flipButton" aria-label="Switch camera" title="Switch camera" disabled>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.3 7H11V5H4v7h2V8.5A7 7 0 0 1 18.8 11h2A9 9 0 0 0 7.3 7ZM18 12v3.5A7 7 0 0 1 5.2 13h-2A9 9 0 0 0 16.7 17H13v2h7v-7h-2Z" /></svg>
               </button>
             </div>
           </section>
 
-          <section class="settings-panel" id="settings" aria-label="Detection settings">
-            <div class="panel-heading settings-heading">
-              <div><p class="section-kicker">ROOM SETTINGS</p><h2>Detection controls</h2></div>
-              <span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10v2H4V7Zm0 8h6v2H4v-2Zm14-9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-4 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" /></svg></span>
+          <p class="error-message" id="errorMessage" role="alert" hidden></p>
+        </div>
+      </section>
+
+      <aside class="control-sidebar" aria-label="Shembot controls">
+        <header class="sidebar-header">
+          <div class="brand-block">
+            <span class="brand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 18V9h3v9H4Zm6 0V4h3v14h-3Zm6 0v-6h3v6h-3Z" /></svg>
+            </span>
+            <div>
+              <strong>Shembot</strong>
+              <span>Vision console</span>
+            </div>
+          </div>
+
+          <div class="app-status" id="appStatus" data-tone="loading" title="Application status">
+            <i></i>
+            <span id="appStatusLabel">Initializing</span>
+          </div>
+        </header>
+
+        <label class="search-box" for="sidebarSearch">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20.7 19.3-4.1-4.1a7.5 7.5 0 1 0-1.4 1.4l4.1 4.1 1.4-1.4ZM5 11a6 6 0 1 1 12 0 6 6 0 0 1-12 0Z" /></svg>
+          <input id="sidebarSearch" type="search" placeholder="Filter controls" autocomplete="off" />
+          <kbd>F</kbd>
+        </label>
+
+        <div class="sidebar-scroll">
+          <section class="control-section" data-control-section>
+            <h2>Camera controls</h2>
+
+            <div class="control-row" data-control-item data-search="camera source switch flip front rear">
+              <span class="row-icon row-icon-blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M15 8.5 19.5 6v12L15 15.5V18H3V6h12v2.5ZM13 8H5v8h8V8Z" /></svg>
+              </span>
+              <span class="row-copy"><strong>Camera source</strong><small>Front or rear lens</small></span>
+              <button class="row-button" type="button" id="sidebarFlipButton" aria-label="Switch camera" disabled>Switch</button>
             </div>
 
-            <label class="range-row" for="capacityInput">
-              <span>Maximum safe capacity</span>
-              <strong>1–50 people</strong>
-              <input id="capacityInput" type="range" min="1" max="50" value="10" />
-            </label>
-
-            <div class="setting-divider"></div>
-
-            <div class="area-controls">
-              <div><strong>Detection area</strong><span id="areaStatus">Full camera frame</span></div>
-              <div class="area-buttons">
+            <div class="control-block" data-control-item data-search="detection area crop focus full frame">
+              <div class="control-row compact-row">
+                <span class="row-icon row-icon-violet" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z" /></svg>
+                </span>
+                <span class="row-copy"><strong>Detection area</strong><small id="areaStatus">Full camera frame</small></span>
+              </div>
+              <div class="button-pair">
                 <button class="secondary-button" id="setAreaButton" disabled>Set area</button>
                 <button class="secondary-button" id="clearAreaButton" disabled>Full frame</button>
               </div>
             </div>
-            <p class="help-copy">Focus on the occupied space to ignore roofs, roads, and other distractions.</p>
-
-            <div class="automatic-detection">
-              <span class="automatic-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 2.1 5.2L20 9l-4.5 3.7.2 5.8-3.7-2.2-3.7 2.2.2-5.8L4 9l5.9-1.8L12 2Zm0 5.4-.7 1.8-.3.7-.7.2-2 .6 1.5 1.2.6.5v.8l-.1 2 1.2-.8.5-.3.5.3 1.2.8-.1-2v-.8l.6-.5 1.5-1.2-2-.6-.7-.2-.3-.7-.7-1.8Z" /></svg></span>
-              <div><strong>Strict person verification</strong><span>Every box must match a human pose when the verifier is available.</span></div>
-            </div>
           </section>
-        </div>
 
-        <section class="feature-grid" aria-label="Accuracy and activity tools">
-          <article class="feature-panel quality-panel">
-            <div class="feature-heading">
-              <div>
-                <p class="section-kicker">ACCURACY ASSISTANT</p>
-                <h2>Camera quality</h2>
-              </div>
-              <span class="feature-icon feature-icon-blue" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M9 4 7.2 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.2L15 4H9Zm3 13a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z" /></svg>
+          <section class="control-section" data-control-section>
+            <h2>AI filters / detection</h2>
+
+            <label class="control-row" data-control-item data-search="detection overlay boxes labels people">
+              <span class="row-icon row-icon-green" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 3h4v2H5v4H3V5a2 2 0 0 1 2-2Zm10 0h4a2 2 0 0 1 2 2v4h-2V5h-4V3ZM3 15h2v4h4v2H5a2 2 0 0 1-2-2v-4Zm16 0h2v4a2 2 0 0 1-2 2h-4v-2h4v-4ZM8 8h8v8H8V8Z" /></svg>
               </span>
-            </div>
-
-            <div class="quality-assistant is-waiting" id="qualityAssistant" role="status">
-              <span class="quality-dot" aria-hidden="true"></span>
-              <div>
-                <strong id="qualityStatus">Waiting for camera</strong>
-                <span id="qualityMessage">Start detection to check lighting and image clarity.</span>
-              </div>
-            </div>
-
-            <div class="feedback-tools">
-              <div>
-                <strong>Help improve detection</strong>
-                <span>Mark the current count or save an incorrect sample locally.</span>
-              </div>
-              <label class="actual-count-field" for="actualCountInput">
-                <span>Actual people</span>
-                <input id="actualCountInput" type="number" min="0" max="200" inputmode="numeric" placeholder="0" />
-              </label>
-              <div class="feature-actions">
-                <button class="tool-button tool-button-positive" id="correctFeedbackButton" disabled>Count is correct</button>
-                <button class="tool-button" id="issueFeedbackButton" disabled>Save incorrect sample</button>
-              </div>
-              <p class="tool-status" id="feedbackStatus" aria-live="polite">Samples stay on this device.</p>
-            </div>
-          </article>
-
-          <article class="feature-panel flow-panel">
-            <div class="feature-heading">
-              <div>
-                <p class="section-kicker">ROOM ACTIVITY</p>
-                <h2>Entry and exit counter</h2>
-              </div>
-              <label class="switch" title="Enable entry and exit counting">
-                <input id="flowToggle" type="checkbox" />
-                <span aria-hidden="true"></span>
-                <b>Flow</b>
-              </label>
-            </div>
-
-            <div class="flow-counts">
-              <div><span>Entered</span><strong id="enteredValue">0</strong></div>
-              <div><span>Exited</span><strong id="exitedValue">0</strong></div>
-            </div>
-
-            <label class="flow-line-control" for="flowLineInput">
-              <span>Counting-line position</span>
-              <input id="flowLineInput" type="range" min="20" max="80" value="60" />
+              <span class="row-copy"><strong>Detection overlay</strong><small>Boxes, labels and zones</small></span>
+              <span class="toggle"><input id="detectionOverlayToggle" type="checkbox" checked /><i></i></span>
             </label>
 
-            <div class="feature-actions">
-              <button class="tool-button" id="flowDirectionButton">Down = entry</button>
-              <button class="tool-button" id="resetFlowButton">Reset flow</button>
+            <label class="control-row" data-control-item data-search="quality lighting clarity assistant">
+              <span class="row-icon row-icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 2 9.8 7.4 4 9l4.5 3.8-.2 5.8 3.7-2.2 3.7 2.2-.2-5.8L20 9l-5.8-1.6L12 2Z" /></svg>
+              </span>
+              <span class="row-copy"><strong>Quality assistant</strong><small>Lighting and clarity checks</small></span>
+              <span class="toggle"><input id="qualityAssistantToggle" type="checkbox" checked /><i></i></span>
+            </label>
+
+            <div class="quality-assistant is-waiting" id="qualityAssistant" role="status" data-control-item data-search="quality camera status">
+              <span class="quality-dot" aria-hidden="true"></span>
+              <span><strong id="qualityStatus">Waiting for camera</strong><small id="qualityMessage">Start detection to check lighting and image clarity.</small></span>
             </div>
 
-            <div class="history-tools">
-              <div>
-                <strong>Count-change history</strong>
-                <span id="historyCount">0 records</span>
+            <div class="control-row" data-control-item data-search="strict person pose verification automatic">
+              <span class="row-icon row-icon-cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m12 2 2.1 5.2L20 9l-4.5 3.7.2 5.8-3.7-2.2-3.7 2.2.2-5.8L4 9l5.9-1.8L12 2Z" /></svg>
+              </span>
+              <span class="row-copy"><strong>Pose verification</strong><small>Strict person matching</small></span>
+              <span class="status-tag">AUTO</span>
+            </div>
+          </section>
+
+          <section class="control-section" data-control-section id="settings">
+            <h2>Settings</h2>
+
+            <label class="control-block" for="capacityInput" data-control-item data-search="capacity room maximum limit people">
+              <span class="range-heading"><span><strong>Room capacity</strong><small>Alert threshold</small></span><output id="capacityOutput" for="capacityInput">10 people</output></span>
+              <input id="capacityInput" type="range" min="1" max="50" value="10" />
+            </label>
+
+            <label class="control-row" data-control-item data-search="flow entry exit counter tracking">
+              <span class="row-icon row-icon-blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M7 3h10v2H7V3Zm5 4 5 5h-3v7h-4v-7H7l5-5Z" /></svg>
+              </span>
+              <span class="row-copy"><strong>Entry / exit flow</strong><small>Track line crossings</small></span>
+              <span class="toggle"><input id="flowToggle" type="checkbox" /><i></i></span>
+            </label>
+
+            <div class="control-block flow-tools" data-control-item data-search="flow entered exited line position direction reset">
+              <div class="flow-counts">
+                <span><small>Entered</small><strong id="enteredValue">0</strong></span>
+                <span><small>Exited</small><strong id="exitedValue">0</strong></span>
               </div>
-              <div class="feature-actions compact-actions">
-                <button class="tool-button" id="downloadHistoryButton">Download CSV</button>
-                <button class="tool-button tool-button-quiet" id="clearHistoryButton">Clear</button>
+              <label class="range-heading" for="flowLineInput"><span><strong>Counting line</strong><small>Position in frame</small></span></label>
+              <input id="flowLineInput" type="range" min="20" max="80" value="60" />
+              <div class="button-pair">
+                <button class="secondary-button" id="flowDirectionButton">Down = entry</button>
+                <button class="secondary-button" id="resetFlowButton">Reset</button>
               </div>
             </div>
-          </article>
-        </section>
+          </section>
 
-        <section class="notes" id="privacy" aria-label="Usage notes">
-          <article>
-            <span class="note-icon note-icon-blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3V6Zm2 2v8h14V8H5Zm3 9h8v2H8v-2Z" /></svg></span>
-            <div><h3>Mount high and wide</h3><p>A corner view with visible upper bodies produces steadier, more accurate counts.</p></div>
-          </article>
-          <article>
-            <span class="note-icon note-icon-green" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3.2 5 1.9V11c0 3.5-2.1 6.7-5 7.8C9.1 17.7 7 14.5 7 11V7.1l5-1.9Zm-1 3.3h2v5h-2v-5Zm0 6.5h2v2h-2v-2Z" /></svg></span>
-            <div><h3>Nothing is uploaded</h3><p>Detection stays in your browser. Camera frames are never recorded or transmitted.</p></div>
-          </article>
-        </section>
+          <section class="control-section" data-control-section>
+            <h2>Review &amp; data</h2>
 
-        <p class="error-message" id="errorMessage" role="alert" hidden></p>
-      </div>
+            <details class="sidebar-disclosure" data-control-item data-search="feedback accuracy correct incorrect actual people sample">
+              <summary>
+                <span class="row-icon row-icon-violet" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4Zm2 2v10.2L7.2 15H18V6H6Zm2 3h8v2H8V9Z" /></svg>
+                </span>
+                <span class="row-copy"><strong>Detection feedback</strong><small>Review the current count</small></span>
+                <span class="chevron" aria-hidden="true"></span>
+              </summary>
+              <div class="disclosure-body">
+                <label class="number-field" for="actualCountInput"><span>Actual people</span><input id="actualCountInput" type="number" min="0" max="200" inputmode="numeric" placeholder="0" /></label>
+                <div class="button-pair">
+                  <button class="secondary-button" id="correctFeedbackButton" disabled>Count is correct</button>
+                  <button class="secondary-button" id="issueFeedbackButton" disabled>Save issue</button>
+                </div>
+                <p id="feedbackStatus" aria-live="polite">Samples stay on this device.</p>
+              </div>
+            </details>
+
+            <details class="sidebar-disclosure" data-control-item data-search="history csv download clear records data">
+              <summary>
+                <span class="row-icon row-icon-green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 3h14v18H5V3Zm2 2v14h10V5H7Zm2 3h6v2H9V8Zm0 4h6v2H9v-2Z" /></svg>
+                </span>
+                <span class="row-copy"><strong>Count history</strong><small id="historyCount">0 saved events</small></span>
+                <span class="chevron" aria-hidden="true"></span>
+              </summary>
+              <div class="disclosure-body">
+                <div class="button-pair">
+                  <button class="secondary-button" id="downloadHistoryButton">Download CSV</button>
+                  <button class="secondary-button" id="clearHistoryButton">Clear</button>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <div class="privacy-note" id="privacy">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm0 3.2 5 1.9V11c0 3.5-2.1 6.7-5 7.8C9.1 17.7 7 14.5 7 11V7.1l5-1.9Z" /></svg>
+            <span><strong>Private by design</strong><small>Frames are processed locally and never uploaded.</small></span>
+          </div>
+
+          <p class="no-results" id="noControlResults" hidden>No controls match your search.</p>
+        </div>
+      </aside>
     </main>
   </body>
 </html>

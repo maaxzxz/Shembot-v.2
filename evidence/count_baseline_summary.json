@@ -1,0 +1,31 @@
+{
+  "detector": "opencv_hog_svm",
+  "split": "validation",
+  "split_bounds_zero_based_end_exclusive": {
+    "train": [
+      0,
+      1400
+    ],
+    "validation": [
+      1400,
+      1700
+    ],
+    "test": [
+      1700,
+      2000
+    ]
+  },
+  "confidence_threshold": 0.0,
+  "upsample": 1.5,
+  "alert_threshold": 30,
+  "dataset_frames": 2000,
+  "label_min": 13,
+  "label_max": 53,
+  "frames_evaluated": 300,
+  "mae": 20.92,
+  "rmse": 21.5177,
+  "exact_match_rate_percent": 0.0,
+  "mean_count_accuracy_percent": 34.1177,
+  "mean_inference_ms": 56.6648,
+  "mean_fps": 17.6476
+}

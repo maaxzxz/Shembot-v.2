@@ -1,0 +1,6 @@
+# CCTV Indoor Person Detection > 2026-02-15 9:37pm
+https://universe.roboflow.com/yolo-k9iku/cctv-indoor-person-detection-bi2vp
+
+Provided by a Roboflow user
+License: CC BY 4.0
+

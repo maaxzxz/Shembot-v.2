@@ -1,0 +1,5 @@
+# The browser prototype itself has no Python package dependency. These pinned
+# packages reproduce the included 30-image CPU validation baseline.
+numpy==2.5.5
+opencv-python==4.14.0.94
+

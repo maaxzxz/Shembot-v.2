@@ -1,0 +1,18 @@
+{
+  "detector": "OpenCV Zoo YOLOX-S INT8, COCO person class only",
+  "split": "source-grouped validation sample",
+  "images_evaluated": 30,
+  "unique_source_groups": 30,
+  "confidence_threshold": 0.25,
+  "nms_threshold": 0.5,
+  "iou_threshold": 0.5,
+  "true_positives": 16,
+  "false_positives": 6,
+  "false_negatives": 191,
+  "precision_at_iou_0_5": 0.727273,
+  "recall_at_iou_0_5": 0.077295,
+  "f1_at_iou_0_5": 0.139738,
+  "count_mae": 6.166667,
+  "mean_inference_ms": 137.97,
+  "mean_fps": 7.248
+}

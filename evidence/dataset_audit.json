@@ -1,0 +1,31 @@
+{
+  "input": "C:\\Computer Vision\\training_data\\cctv_indoor_voc",
+  "output": "C:\\Computer Vision\\training_data\\cctv_indoor_clean",
+  "images": {
+    "train": 1072,
+    "test": 133,
+    "valid": 145
+  },
+  "source_groups": {
+    "train": 438,
+    "test": 53,
+    "valid": 61
+  },
+  "boxes": {
+    "train": 8332,
+    "test": 1056,
+    "valid": 1051
+  },
+  "corrected_boxes": {
+    "train": 153,
+    "test": 31,
+    "valid": 19
+  },
+  "removed_boxes": {
+    "train": 0,
+    "test": 0,
+    "valid": 0
+  },
+  "missing_image_pairs": [],
+  "class_name": "person"
+}

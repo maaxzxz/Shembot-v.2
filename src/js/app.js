@@ -2,32 +2,27 @@ import {
   FilesetResolver,
   ObjectDetector,
   PoseLandmarker,
-} from "./vision_bundle.mjs";
-import {
-  boxArea,
-  boxCenter,
-  consolidateDetections,
-  intersectionOverSmaller,
-  intersectionOverUnion,
-  isTrackAbsorbedByMergedDetection,
-  selectVerifiedPeople,
-} from "./detection_logic.mjs?v=20261119-person-fix4";
+} from "../../lib/mediapipe/vision_bundle.js";
 
-const MEDIAPIPE_WASM = "./wasm";
-const MODEL_PATH = "./efficientdet_lite0.tflite";
-const POSE_MODEL_PATH = "./pose_landmarker_lite.task";
-const IS_MOBILE_DEVICE = /Android|iPhone|iPad|iPod|Mobile/i.test(
-  navigator.userAgent,
-);
-const MAX_INFERENCE_DIMENSION = IS_MOBILE_DEVICE ? 384 : 512;
+const MEDIAPIPE_WASM = new URL(
+  "../../lib/mediapipe/wasm",
+  import.meta.url,
+).href;
+const MODEL_PATH = new URL(
+  "../../lib/mediapipe/models/efficientdet_lite0.tflite",
+  import.meta.url,
+).href;
+const POSE_MODEL_PATH = new URL(
+  "../../lib/mediapipe/models/pose_landmarker_lite.task",
+  import.meta.url,
+).href;
+const MAX_INFERENCE_DIMENSION = 512;
 const TRACK_HOLD_MS = 3400;
 const RECALIBRATE_AFTER_MS = 4000;
-const FULL_FRAME_SCORE_FLOOR = 0.34;
-const ZOOMED_SCORE_FLOOR = 0.32;
-const STRONG_FULL_FRAME_SCORE = 0.56;
-const STRONG_ZOOMED_SCORE = 0.6;
-const POSE_VERIFICATION_INTERVAL_MS = IS_MOBILE_DEVICE ? 950 : 650;
-const FULL_POSE_CACHE_MS = IS_MOBILE_DEVICE ? 1400 : 900;
+const FULL_FRAME_SCORE_FLOOR = 0.3;
+const ZOOMED_SCORE_FLOOR = 0.25;
+const POSE_VERIFICATION_INTERVAL_MS = 420;
+const POSE_CACHE_MS = 1100;
 const ORIENTATION_SAMPLES = 2;
 const QUALITY_CHECK_INTERVAL_MS = 1200;
 const HISTORY_LIMIT = 1200;
@@ -43,6 +38,7 @@ const elements = {
   modelStatus: document.querySelector("#modelStatus"),
   startButton: document.querySelector("#startButton"),
   flipButton: document.querySelector("#flipButton"),
+  sidebarFlipButton: document.querySelector("#sidebarFlipButton"),
   setAreaButton: document.querySelector("#setAreaButton"),
   clearAreaButton: document.querySelector("#clearAreaButton"),
   areaStatus: document.querySelector("#areaStatus"),
@@ -70,6 +66,8 @@ const elements = {
   downloadHistoryButton: document.querySelector("#downloadHistoryButton"),
   clearHistoryButton: document.querySelector("#clearHistoryButton"),
   errorMessage: document.querySelector("#errorMessage"),
+  appStatus: document.querySelector("#appStatus"),
+  appStatusLabel: document.querySelector("#appStatusLabel"),
 };
 
 const inferenceCanvas = document.createElement("canvas");
@@ -156,8 +154,7 @@ const state = {
   scanIndex: 0,
   scanDetections: [],
   lastPoseVerificationAt: -Infinity,
-  cyclePoseDetections: [],
-  poseCycleId: 0,
+  lastPoseDetections: [],
   tracks: [],
   lastConfirmedTracks: [],
   area: loadSavedArea(),
@@ -203,6 +200,11 @@ function showError(message) {
 function clearError() {
   elements.errorMessage.hidden = true;
   elements.errorMessage.textContent = "";
+}
+
+function updateAppStatus(label, tone) {
+  elements.appStatusLabel.textContent = label;
+  elements.appStatus.dataset.tone = tone;
 }
 
 function median(values) {
@@ -393,8 +395,7 @@ function resetTracking() {
   state.scanIndex = 0;
   state.scanDetections = [];
   state.lastPoseVerificationAt = -Infinity;
-  state.cyclePoseDetections = [];
-  state.poseCycleId += 1;
+  state.lastPoseDetections = [];
   updateCapacity(0);
 }
 
@@ -439,11 +440,21 @@ function getCrop(areaOverride) {
 
 function getScanAreas() {
   const base = state.area || { x: 0, y: 0, width: 1, height: 1 };
-  // One full-frame inference is substantially more stable than combining four
-  // overlapping tile scans. Tiles magnified furniture, posters, and individual
-  // body parts into separate people. A selected detection area still provides
-  // optical zoom when distant people need to be enlarged.
-  return [{ ...base, kind: "full" }];
+  const tileSize = 0.58;
+  const tileOffset = 1 - tileSize;
+  const tiles = [
+    { x: 0, y: 0 },
+    { x: tileOffset, y: 0 },
+    { x: 0, y: tileOffset },
+    { x: tileOffset, y: tileOffset },
+  ].map((tile) => ({
+    x: base.x + tile.x * base.width,
+    y: base.y + tile.y * base.height,
+    width: tileSize * base.width,
+    height: tileSize * base.height,
+    kind: "tile",
+  }));
+  return [{ ...base, kind: "full" }, ...tiles];
 }
 
 function prepareInferenceFrame(rotation, areaOverride) {
@@ -707,14 +718,10 @@ function poseResultToDetections(result, frame, scanArea) {
       .filter((index) => visibleByIndex.has(index)).length;
     const visibleArmPoints = [13, 14, 15, 16]
       .filter((index) => visibleByIndex.has(index)).length;
-    // A verification pose must contain a real torso. Requiring both shoulders,
-    // a hip, and a head point prevents furniture, containers, and isolated body
-    // parts from becoming people.
     if (
-      visible.length < 7 ||
-      shoulders.length < 2 ||
-      hips.length < 1 ||
-      visibleHeadPoints < 1
+      visible.length < 5 ||
+      shoulders.length === 0 ||
+      (hips.length === 0 && visibleHeadPoints === 0 && visibleArmPoints < 2)
     ) {
       return [];
     }
@@ -745,6 +752,13 @@ function poseResultToDetections(result, frame, scanArea) {
         landmark.presence ?? 1,
       )),
     );
+    const strongStandalonePose =
+      visible.length >= 9 &&
+      shoulders.length === 2 &&
+      hips.length >= 1 &&
+      (visibleHeadPoints >= 1 || visibleArmPoints >= 2) &&
+      landmarkConfidence >= 0.45;
+
     return [{
       bbox: [left, top, right - left, bottom - top],
       score: clamp(landmarkConfidence, 0.45, 0.95),
@@ -752,7 +766,7 @@ function poseResultToDetections(result, frame, scanArea) {
       relativeScanArea: ((right - left) * (bottom - top)) /
         Math.max(1, frame.sourceWidth * frame.sourceHeight),
       edgeCropped: false,
-      strongStandalonePose: false,
+      strongStandalonePose,
     }];
   });
 }
@@ -873,6 +887,45 @@ function handleCalibrationResult(result, frame) {
   return true;
 }
 
+function intersectionOverUnion(first, second) {
+  const left = Math.max(first[0], second[0]);
+  const top = Math.max(first[1], second[1]);
+  const right = Math.min(first[0] + first[2], second[0] + second[2]);
+  const bottom = Math.min(first[1] + first[3], second[1] + second[3]);
+  const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
+  const union =
+    first[2] * first[3] + second[2] * second[3] - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
+function intersectionOverSmaller(first, second) {
+  const left = Math.max(first[0], second[0]);
+  const top = Math.max(first[1], second[1]);
+  const right = Math.min(first[0] + first[2], second[0] + second[2]);
+  const bottom = Math.min(first[1] + first[3], second[1] + second[3]);
+  const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
+  const smallerArea = Math.min(boxArea(first), boxArea(second));
+  return smallerArea > 0 ? intersection / smallerArea : 0;
+}
+
+function boxArea(box) {
+  return Math.max(0, box[2]) * Math.max(0, box[3]);
+}
+
+function boxCenter(box) {
+  return [box[0] + box[2] / 2, box[1] + box[3] / 2];
+}
+
+function centerIsInside(innerBox, outerBox) {
+  const [x, y] = boxCenter(innerBox);
+  return (
+    x >= outerBox[0] &&
+    x <= outerBox[0] + outerBox[2] &&
+    y >= outerBox[1] &&
+    y <= outerBox[1] + outerBox[3]
+  );
+}
+
 function boxMatchScore(first, second) {
   const overlap = intersectionOverUnion(first, second);
   const firstCenter = boxCenter(first);
@@ -891,6 +944,37 @@ function boxMatchScore(first, second) {
   const proximity = clamp(1 - distance / (smallerDiagonal * 0.65), 0, 1);
   if (overlap < 0.12 && proximity < 0.55) return 0;
   return Math.max(overlap, proximity * 0.7);
+}
+
+function boxesAreDuplicate(first, second) {
+  const overlap = intersectionOverUnion(first, second);
+  const firstArea = boxArea(first);
+  const secondArea = boxArea(second);
+  const areaRatio = Math.max(firstArea, secondArea) /
+    Math.max(1, Math.min(firstArea, secondArea));
+  if (
+    overlap >= 0.45 ||
+    (areaRatio <= 2.5 && intersectionOverSmaller(first, second) >= 0.65)
+  ) {
+    return true;
+  }
+
+  if (areaRatio > 5) return false;
+
+  const firstCenter = boxCenter(first);
+  const secondCenter = boxCenter(second);
+  const distance = Math.hypot(
+    firstCenter[0] - secondCenter[0],
+    firstCenter[1] - secondCenter[1],
+  );
+  const smallerDiagonal = Math.max(
+    1,
+    Math.min(
+      Math.hypot(first[2], first[3]),
+      Math.hypot(second[2], second[3]),
+    ),
+  );
+  return distance < smallerDiagonal * 0.22;
 }
 
 function detectionsCorrespond(first, second) {
@@ -927,6 +1011,35 @@ function poseMatchQuality(detection, pose) {
   );
   const proximity = clamp(1 - distance / detectionDiagonal, 0, 1);
   return overlap * 2 + containment + proximity * 0.5;
+}
+
+function consolidateDetections(detections) {
+  // Keep smaller individual detections until after duplicate removal. A broad
+  // full-frame box can cover several overlapping people, so discarding the
+  // boxes inside it turns a crowd into one person.
+  const countable = detections.filter((detection) => !detection.edgeCropped);
+  const sorted = [...countable].sort(
+    (first, second) => second.score - first.score,
+  );
+  const unique = [];
+
+  for (const detection of sorted) {
+    if (!unique.some((kept) => boxesAreDuplicate(kept.bbox, detection.bbox))) {
+      unique.push(detection);
+    }
+  }
+
+  return unique.filter((candidate) => {
+    const candidateArea = boxArea(candidate.bbox);
+    const containedPeople = unique.filter((other) => {
+      if (other === candidate) return false;
+      return (
+        boxArea(other.bbox) < candidateArea * 0.65 &&
+        centerIsInside(other.bbox, candidate.bbox)
+      );
+    });
+    return containedPeople.length < 2;
+  });
 }
 
 function smoothBox(previous, next) {
@@ -966,8 +1079,6 @@ function updateTracks(detections, now) {
       bestTrack.hits += 1;
       bestTrack.lastSeen = now;
       if (detection.verifiedByPose) bestTrack.confirmed = true;
-      bestTrack.poseGroupId = detection.poseGroupId ?? null;
-      bestTrack.mergedByPose = Boolean(detection.mergedByPose);
       const requiredHits = bestTrack.maxScore >= 0.75 ? 3 : 4;
       if (bestTrack.hits >= requiredHits) bestTrack.confirmed = true;
       unmatchedTracks.delete(bestTrack.id);
@@ -980,21 +1091,12 @@ function updateTracks(detections, now) {
         hits: 1,
         lastSeen: now,
         confirmed: Boolean(detection.verifiedByPose),
-        poseGroupId: detection.poseGroupId ?? null,
-        mergedByPose: Boolean(detection.mergedByPose),
       });
     }
   }
 
   const activeTracks = [];
   for (const track of state.tracks) {
-    if (
-      unmatchedTracks.has(track.id) &&
-      isTrackAbsorbedByMergedDetection(track, detections)
-    ) {
-      state.flowTracks.delete(track.id);
-      continue;
-    }
     const age = now - track.lastSeen;
     if (age <= TRACK_HOLD_MS) activeTracks.push(track);
     else state.flowTracks.delete(track.id);
@@ -1195,8 +1297,8 @@ function detectLoop(token) {
     state.scanIndex = (state.scanIndex + 1) % scanAreas.length;
 
     const minimumScore = scanArea?.kind === "full"
-      ? FULL_FRAME_SCORE_FLOOR
-      : ZOOMED_SCORE_FLOOR;
+      ? (state.poseLandmarker ? 0.26 : FULL_FRAME_SCORE_FLOOR)
+      : (state.poseLandmarker ? 0.22 : ZOOMED_SCORE_FLOOR);
     const people = (result.detections || [])
       .filter((detection) => isPlausiblePerson(detection, frame, minimumScore))
       .map((detection) => {
@@ -1226,41 +1328,47 @@ function detectLoop(token) {
     const poseWasAvailable = Boolean(state.poseLandmarker);
     const needsPoseVerification =
       poseWasAvailable &&
-      scanArea?.kind === "full" &&
       performance.now() - state.lastPoseVerificationAt >=
         POSE_VERIFICATION_INTERVAL_MS;
     const now = performance.now();
+    const poseDetections = needsPoseVerification
+      ? safelyDetectPoses(frame, scanArea)
+      : now - state.lastPoseVerificationAt <= POSE_CACHE_MS
+        ? state.lastPoseDetections
+        : [];
     if (needsPoseVerification) {
-      state.poseCycleId += 1;
-      state.cyclePoseDetections = consolidateDetections(
-        safelyDetectPoses(frame, scanArea),
-      ).map((pose, index) => ({
-        ...pose,
-        poseGroupId: `${state.poseCycleId}-${index}`,
-      }));
       state.lastPoseVerificationAt = now;
-    } else if (
-      scanArea?.kind === "full" &&
-      now - state.lastPoseVerificationAt > FULL_POSE_CACHE_MS
-    ) {
-      state.cyclePoseDetections = [];
+      state.lastPoseDetections = poseDetections;
     }
-    const poseDetections = state.cyclePoseDetections;
-    const strongScore = scanArea?.kind === "full"
-      ? STRONG_FULL_FRAME_SCORE
-      : STRONG_ZOOMED_SCORE;
-    // Pose can confirm a detector result, but it can never create a person by
-    // itself. This prevents furniture and body fragments from being counted.
-    const verifiedPeople = selectVerifiedPeople(
-      people,
-      poseDetections,
-      strongScore,
-      poseMatchQuality,
-      {
-        requirePose: poseWasAvailable,
-        exceptionalScore: 0.88,
-      },
-    );
+    const verifiedPeople = !poseWasAvailable || !state.poseLandmarker
+      ? people
+      : poseDetections.flatMap((pose) => {
+          let matchingDetection = null;
+          let bestMatchQuality = 0;
+          for (const detection of people) {
+            const quality = poseMatchQuality(detection, pose);
+            if (quality > bestMatchQuality) {
+              matchingDetection = detection;
+              bestMatchQuality = quality;
+            }
+          }
+          if (!matchingDetection && !pose.strongStandalonePose) return [];
+          const source = matchingDetection || pose;
+          return [{
+            ...source,
+            // A detector can return one broad box around several overlapping
+            // people. Emit every verified pose so each visible person remains
+            // an independent candidate instead of selecting only one pose. A
+            // strong multi-keypoint pose can also recover a person that the
+            // object detector missed completely.
+            bbox: [...pose.bbox],
+            score: matchingDetection ? matchingDetection.score : pose.score,
+            relativeScanArea: boxArea(pose.bbox) /
+              Math.max(1, frame.sourceWidth * frame.sourceHeight),
+            edgeCropped: false,
+            verifiedByPose: true,
+          }];
+        });
     state.scanDetections.push(...verifiedPeople);
     const scanCycleComplete = state.scanIndex === 0;
     let confirmedTracks = consolidateDetections(
@@ -1344,13 +1452,15 @@ async function startCamera() {
     elements.emptyState.hidden = true;
     elements.hud.hidden = false;
     elements.flipButton.disabled = false;
+    elements.sidebarFlipButton.disabled = false;
     elements.setAreaButton.disabled = false;
     elements.correctFeedbackButton.disabled = false;
     elements.issueFeedbackButton.disabled = false;
     elements.feedbackStatus.textContent = "Samples stay on this device.";
     elements.startButton.classList.add("is-running");
     elements.startButton.innerHTML =
-      '<span class="button-icon">■</span> Stop camera';
+      '<span class="button-icon">&#9632;</span> Stop camera';
+    updateAppStatus("Camera live", "live");
     updateAreaControls();
     await requestWakeLock();
     beginOrientationCalibration();
@@ -1362,6 +1472,7 @@ async function startCamera() {
         ? "Camera permission was denied. Allow camera access in the browser's site settings and try again."
         : "The camera could not start. Close other apps using the camera, then try again.";
     showError(guidance);
+    updateAppStatus("Camera error", "error");
   }
 }
 
@@ -1392,13 +1503,15 @@ function stopCamera() {
   elements.hud.hidden = true;
   elements.emptyState.hidden = false;
   elements.flipButton.disabled = true;
+  elements.sidebarFlipButton.disabled = true;
   elements.setAreaButton.disabled = true;
   elements.clearAreaButton.disabled = true;
   elements.correctFeedbackButton.disabled = true;
   elements.issueFeedbackButton.disabled = true;
   elements.startButton.classList.remove("is-running");
   elements.startButton.innerHTML =
-    '<span class="button-icon">●</span> Start camera';
+    '<span class="button-icon">&#9679;</span> Start camera';
+  updateAppStatus("Ready", "ready");
   elements.cameraCard.classList.remove("is-alert");
   updateQualityUi(
     "waiting",
@@ -1487,6 +1600,7 @@ elements.startButton.addEventListener("click", () => {
   else startCamera();
 });
 elements.flipButton.addEventListener("click", flipCamera);
+elements.sidebarFlipButton.addEventListener("click", flipCamera);
 elements.setAreaButton.addEventListener("click", startAreaSelection);
 elements.clearAreaButton.addEventListener("click", clearArea);
 elements.camera.addEventListener("loadedmetadata", syncCanvas);
@@ -1531,6 +1645,61 @@ elements.clearHistoryButton.addEventListener("click", () => {
   state.lastLoggedCount = null;
   localStorage.removeItem("crowdCountHistory");
   updateHistoryUi();
+});
+
+const overlayToggle = document.querySelector("#detectionOverlayToggle");
+const qualityToggle = document.querySelector("#qualityAssistantToggle");
+const sidebarSearch = document.querySelector("#sidebarSearch");
+const noControlResults = document.querySelector("#noControlResults");
+const privacyNote = document.querySelector("#privacy");
+
+overlayToggle.addEventListener("change", () => {
+  elements.overlay.classList.toggle("overlay-disabled", !overlayToggle.checked);
+});
+
+qualityToggle.addEventListener("change", () => {
+  elements.qualityAssistant.classList.toggle(
+    "is-collapsed",
+    !qualityToggle.checked,
+  );
+});
+
+function filterSidebarControls() {
+  const query = sidebarSearch.value.trim().toLowerCase();
+  let visibleItems = 0;
+
+  document.querySelectorAll("[data-control-section]").forEach((section) => {
+    let sectionMatches = 0;
+    section.querySelectorAll(":scope > [data-control-item]").forEach((item) => {
+      const matches = !query || item.dataset.search.includes(query);
+      item.hidden = !matches;
+      if (matches) sectionMatches += 1;
+    });
+    section.hidden = sectionMatches === 0;
+    visibleItems += sectionMatches;
+  });
+
+  privacyNote.hidden = Boolean(query);
+  noControlResults.hidden = visibleItems !== 0;
+}
+
+sidebarSearch.addEventListener("input", filterSidebarControls);
+document.addEventListener("keydown", (event) => {
+  const isTyping = /input|textarea|select/i.test(event.target.tagName);
+  if (
+    !isTyping &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    event.key.toLowerCase() === "f"
+  ) {
+    event.preventDefault();
+    sidebarSearch.focus();
+  }
+  if (event.key === "Escape" && document.activeElement === sidebarSearch) {
+    sidebarSearch.value = "";
+    filterSidebarControls();
+    sidebarSearch.blur();
+  }
 });
 
 elements.zoneSelection.addEventListener("pointerdown", (event) => {
@@ -1602,15 +1771,16 @@ async function createPoseLandmarker(vision, delegate) {
       delegate,
     },
     runningMode: "IMAGE",
-    numPoses: IS_MOBILE_DEVICE ? 5 : 8,
-    minPoseDetectionConfidence: 0.4,
-    minPosePresenceConfidence: 0.4,
+    numPoses: 15,
+    minPoseDetectionConfidence: 0.25,
+    minPosePresenceConfidence: 0.25,
     outputSegmentationMasks: false,
   });
 }
 
 async function loadModel() {
   try {
+    updateAppStatus("Loading", "loading");
     elements.modelStatus.textContent = "Loading fast mobile person detector...";
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
 
@@ -1622,38 +1792,31 @@ async function loadModel() {
       state.detector = await createDetector(vision, "CPU");
     }
 
-    // The detector is enough to start the camera. Pose verification is an
-    // optional background enhancement and must never block phones on startup.
+    elements.modelStatus.textContent = "Loading automatic person verifier...";
+    try {
+      state.poseLandmarker = await createPoseLandmarker(vision, "GPU");
+    } catch (gpuError) {
+      console.warn("GPU pose verifier unavailable; using CPU.", gpuError);
+      try {
+        state.poseLandmarker = await createPoseLandmarker(vision, "CPU");
+      } catch (poseError) {
+        console.warn(
+          "Pose verification unavailable; using detector-only fallback.",
+          poseError,
+        );
+        state.poseLandmarker = null;
+      }
+    }
+
     elements.modelLoading.hidden = true;
     elements.startButton.disabled = false;
-    const loadVerifier = () => loadPoseVerifierInBackground(vision);
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(loadVerifier, { timeout: 1800 });
-    } else {
-      window.setTimeout(loadVerifier, 500);
-    }
+    updateAppStatus("Ready", "ready");
   } catch (error) {
     console.error(error);
     elements.modelStatus.textContent = "Detector could not load";
+    updateAppStatus("Model error", "error");
     showError(
       "The detection model could not load. Check the internet connection and reload the page.",
     );
-  }
-}
-
-async function loadPoseVerifierInBackground(vision) {
-  try {
-    state.poseLandmarker = await createPoseLandmarker(vision, "GPU");
-  } catch (gpuError) {
-    console.warn("GPU pose verifier unavailable; using CPU.", gpuError);
-    try {
-      state.poseLandmarker = await createPoseLandmarker(vision, "CPU");
-    } catch (poseError) {
-      console.warn(
-        "Pose verification unavailable; using detector-only fallback.",
-        poseError,
-      );
-      state.poseLandmarker = null;
-    }
   }
 }

@@ -1,0 +1,5 @@
+# Optional Python 3.9 training environment; not required to run the website.
+tensorflow==2.10.1
+tflite-model-maker==0.4.3
+numpy==1.23.3
+
