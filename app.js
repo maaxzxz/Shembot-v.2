@@ -11,7 +11,7 @@ import {
   intersectionOverUnion,
   isTrackAbsorbedByMergedDetection,
   selectVerifiedPeople,
-} from "./detection_logic.mjs?v=20261119-person-fix3";
+} from "./detection_logic.mjs?v=20261119-person-fix4";
 
 const MEDIAPIPE_WASM = "./wasm";
 const MODEL_PATH = "./efficientdet_lite0.tflite";
@@ -439,21 +439,11 @@ function getCrop(areaOverride) {
 
 function getScanAreas() {
   const base = state.area || { x: 0, y: 0, width: 1, height: 1 };
-  const tileSize = 0.58;
-  const tileOffset = 1 - tileSize;
-  const tiles = [
-    { x: 0, y: 0 },
-    { x: tileOffset, y: 0 },
-    { x: 0, y: tileOffset },
-    { x: tileOffset, y: tileOffset },
-  ].map((tile) => ({
-    x: base.x + tile.x * base.width,
-    y: base.y + tile.y * base.height,
-    width: tileSize * base.width,
-    height: tileSize * base.height,
-    kind: "tile",
-  }));
-  return [{ ...base, kind: "full" }, ...tiles];
+  // One full-frame inference is substantially more stable than combining four
+  // overlapping tile scans. Tiles magnified furniture, posters, and individual
+  // body parts into separate people. A selected detection area still provides
+  // optical zoom when distant people need to be enlarged.
+  return [{ ...base, kind: "full" }];
 }
 
 function prepareInferenceFrame(rotation, areaOverride) {
@@ -1266,6 +1256,10 @@ function detectLoop(token) {
       poseDetections,
       strongScore,
       poseMatchQuality,
+      {
+        requirePose: poseWasAvailable,
+        exceptionalScore: 0.88,
+      },
     );
     state.scanDetections.push(...verifiedPeople);
     const scanCycleComplete = state.scanIndex === 0;

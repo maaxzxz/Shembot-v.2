@@ -85,5 +85,27 @@ assert.equal(
   1,
   "a strong detector result must work before the optional pose model loads",
 );
+assert.equal(
+  selectVerifiedPeople(
+    [{ bbox: [100, 100, 100, 260], score: 0.75 }],
+    [],
+    0.56,
+    () => 0,
+    { requirePose: true, exceptionalScore: 0.88 },
+  ).length,
+  0,
+  "ordinary detector boxes must not bypass an available pose verifier",
+);
+assert.equal(
+  selectVerifiedPeople(
+    [{ bbox: [100, 100, 100, 260], score: 0.92 }],
+    [],
+    0.56,
+    () => 0,
+    { requirePose: true, exceptionalScore: 0.88 },
+  ).length,
+  1,
+  "an exceptional detector result may survive a temporary pose miss",
+);
 
 console.log("detection logic tests passed");

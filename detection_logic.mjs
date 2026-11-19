@@ -163,7 +163,10 @@ export function selectVerifiedPeople(
   poses,
   strongScore,
   matchQuality,
+  options = {},
 ) {
+  const requirePose = Boolean(options.requirePose);
+  const exceptionalScore = options.exceptionalScore ?? 0.88;
   return detections.flatMap((detection) => {
     let bestPoseQuality = 0;
     let bestPose = null;
@@ -178,6 +181,9 @@ export function selectVerifiedPeople(
     const verifiedByPose = bestPoseQuality >= 1.05;
     const correspondsToPose = bestPoseQuality >= 0.35;
     if (!verifiedByPose && detection.score < strongScore) return [];
+    if (requirePose && !verifiedByPose && detection.score < exceptionalScore) {
+      return [];
+    }
     return [{
       ...detection,
       bbox: [...detection.bbox],
