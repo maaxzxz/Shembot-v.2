@@ -84,7 +84,34 @@ function preferredDetection(first, second) {
   const firstArea = boxArea(first.bbox);
   const secondArea = boxArea(second.bbox);
   const containment = intersectionOverSmaller(first.bbox, second.bbox);
+  const sameVerifiedPose =
+    first.poseGroupId != null &&
+    second.poseGroupId != null &&
+    first.poseGroupId === second.poseGroupId;
   let preferred;
+
+  if (sameVerifiedPose) {
+    const left = Math.min(first.bbox[0], second.bbox[0]);
+    const top = Math.min(first.bbox[1], second.bbox[1]);
+    const right = Math.max(
+      first.bbox[0] + first.bbox[2],
+      second.bbox[0] + second.bbox[2],
+    );
+    const bottom = Math.max(
+      first.bbox[1] + first.bbox[3],
+      second.bbox[1] + second.bbox[3],
+    );
+    preferred = first.score >= second.score ? first : second;
+    return {
+      ...preferred,
+      bbox: [left, top, right - left, bottom - top],
+      score: Math.max(first.score, second.score),
+      verifiedByPose: Boolean(first.verifiedByPose || second.verifiedByPose),
+      fromFullScan: Boolean(first.fromFullScan || second.fromFullScan),
+      poseGroupId: first.poseGroupId,
+      mergedByPose: true,
+    };
+  }
 
   // Keep the body-sized box when a head/torso/leg box is nested inside it.
   if (containment >= 0.72 && Math.max(firstArea, secondArea) >=
@@ -149,12 +176,20 @@ export function selectVerifiedPeople(
     }
 
     const verifiedByPose = bestPoseQuality >= 1.05;
+    const correspondsToPose = bestPoseQuality >= 0.35;
     if (!verifiedByPose && detection.score < strongScore) return [];
     return [{
       ...detection,
       bbox: [...detection.bbox],
       verifiedByPose,
-      poseGroupId: verifiedByPose ? bestPose?.poseGroupId ?? null : null,
+      poseGroupId: correspondsToPose ? bestPose?.poseGroupId ?? null : null,
     }];
   });
+}
+
+export function isTrackAbsorbedByMergedDetection(track, detections) {
+  return detections.some((detection) =>
+    detection.mergedByPose &&
+    intersectionOverSmaller(track.bbox, detection.bbox) >= 0.72
+  );
 }

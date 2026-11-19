@@ -9,8 +9,9 @@ import {
   consolidateDetections,
   intersectionOverSmaller,
   intersectionOverUnion,
+  isTrackAbsorbedByMergedDetection,
   selectVerifiedPeople,
-} from "./detection_logic.mjs?v=20261119-person-fix2";
+} from "./detection_logic.mjs?v=20261119-person-fix3";
 
 const MEDIAPIPE_WASM = "./wasm";
 const MODEL_PATH = "./efficientdet_lite0.tflite";
@@ -975,6 +976,8 @@ function updateTracks(detections, now) {
       bestTrack.hits += 1;
       bestTrack.lastSeen = now;
       if (detection.verifiedByPose) bestTrack.confirmed = true;
+      bestTrack.poseGroupId = detection.poseGroupId ?? null;
+      bestTrack.mergedByPose = Boolean(detection.mergedByPose);
       const requiredHits = bestTrack.maxScore >= 0.75 ? 3 : 4;
       if (bestTrack.hits >= requiredHits) bestTrack.confirmed = true;
       unmatchedTracks.delete(bestTrack.id);
@@ -987,12 +990,21 @@ function updateTracks(detections, now) {
         hits: 1,
         lastSeen: now,
         confirmed: Boolean(detection.verifiedByPose),
+        poseGroupId: detection.poseGroupId ?? null,
+        mergedByPose: Boolean(detection.mergedByPose),
       });
     }
   }
 
   const activeTracks = [];
   for (const track of state.tracks) {
+    if (
+      unmatchedTracks.has(track.id) &&
+      isTrackAbsorbedByMergedDetection(track, detections)
+    ) {
+      state.flowTracks.delete(track.id);
+      continue;
+    }
     const age = now - track.lastSeen;
     if (age <= TRACK_HOLD_MS) activeTracks.push(track);
     else state.flowTracks.delete(track.id);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   boxesAreDuplicate,
   consolidateDetections,
+  isTrackAbsorbedByMergedDetection,
   selectVerifiedPeople,
 } from "../detection_logic.mjs";
 
@@ -31,7 +32,18 @@ const tileFragments = [
   { bbox: [126, 207, 252, 289], score: 0.71, poseGroupId: "pose-1" },
   { bbox: [280, 207, 260, 289], score: 0.73, poseGroupId: "pose-1" },
 ];
-assert.equal(consolidateDetections(tileFragments).length, 1);
+const mergedTileFragments = consolidateDetections(tileFragments);
+assert.equal(mergedTileFragments.length, 1);
+assert.deepEqual(mergedTileFragments[0].bbox, [126, 0, 414, 496]);
+assert.equal(mergedTileFragments[0].mergedByPose, true);
+assert.equal(
+  isTrackAbsorbedByMergedDetection(
+    { bbox: [142, 0, 240, 286] },
+    mergedTileFragments,
+  ),
+  true,
+  "an old partial-body track must be removed once the pose union absorbs it",
+);
 
 const fakePose = {
   bbox: [400, 100, 180, 400],
@@ -61,7 +73,7 @@ assert.equal(
     () => 2,
   )[0].poseGroupId,
   "pose-test",
-  "a verified detector result must inherit its full-frame pose identity",
+  "a detector result corresponding to a pose must inherit its identity",
 );
 assert.equal(
   selectVerifiedPeople(
