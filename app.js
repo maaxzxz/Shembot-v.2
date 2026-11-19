@@ -10,7 +10,7 @@ import {
   intersectionOverSmaller,
   intersectionOverUnion,
   selectVerifiedPeople,
-} from "./detection_logic.mjs?v=20261119-person-fix1";
+} from "./detection_logic.mjs?v=20261119-person-fix2";
 
 const MEDIAPIPE_WASM = "./wasm";
 const MODEL_PATH = "./efficientdet_lite0.tflite";
@@ -26,6 +26,7 @@ const ZOOMED_SCORE_FLOOR = 0.32;
 const STRONG_FULL_FRAME_SCORE = 0.56;
 const STRONG_ZOOMED_SCORE = 0.6;
 const POSE_VERIFICATION_INTERVAL_MS = IS_MOBILE_DEVICE ? 950 : 650;
+const FULL_POSE_CACHE_MS = IS_MOBILE_DEVICE ? 1400 : 900;
 const ORIENTATION_SAMPLES = 2;
 const QUALITY_CHECK_INTERVAL_MS = 1200;
 const HISTORY_LIMIT = 1200;
@@ -154,6 +155,8 @@ const state = {
   scanIndex: 0,
   scanDetections: [],
   lastPoseVerificationAt: -Infinity,
+  cyclePoseDetections: [],
+  poseCycleId: 0,
   tracks: [],
   lastConfirmedTracks: [],
   area: loadSavedArea(),
@@ -389,6 +392,8 @@ function resetTracking() {
   state.scanIndex = 0;
   state.scanDetections = [];
   state.lastPoseVerificationAt = -Infinity;
+  state.cyclePoseDetections = [];
+  state.poseCycleId += 1;
   updateCapacity(0);
 }
 
@@ -1219,15 +1224,26 @@ function detectLoop(token) {
     const poseWasAvailable = Boolean(state.poseLandmarker);
     const needsPoseVerification =
       poseWasAvailable &&
+      scanArea?.kind === "full" &&
       performance.now() - state.lastPoseVerificationAt >=
         POSE_VERIFICATION_INTERVAL_MS;
     const now = performance.now();
-    const poseDetections = needsPoseVerification
-      ? consolidateDetections(safelyDetectPoses(frame, scanArea))
-      : [];
     if (needsPoseVerification) {
+      state.poseCycleId += 1;
+      state.cyclePoseDetections = consolidateDetections(
+        safelyDetectPoses(frame, scanArea),
+      ).map((pose, index) => ({
+        ...pose,
+        poseGroupId: `${state.poseCycleId}-${index}`,
+      }));
       state.lastPoseVerificationAt = now;
+    } else if (
+      scanArea?.kind === "full" &&
+      now - state.lastPoseVerificationAt > FULL_POSE_CACHE_MS
+    ) {
+      state.cyclePoseDetections = [];
     }
+    const poseDetections = state.cyclePoseDetections;
     const strongScore = scanArea?.kind === "full"
       ? STRONG_FULL_FRAME_SCORE
       : STRONG_ZOOMED_SCORE;

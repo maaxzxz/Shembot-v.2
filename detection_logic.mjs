@@ -102,6 +102,7 @@ function preferredDetection(first, second) {
     score: Math.max(first.score, second.score),
     verifiedByPose: Boolean(first.verifiedByPose || second.verifiedByPose),
     fromFullScan: Boolean(first.fromFullScan || second.fromFullScan),
+    poseGroupId: first.poseGroupId ?? second.poseGroupId ?? null,
   };
 }
 
@@ -116,9 +117,13 @@ export function consolidateDetections(detections) {
   const unique = [];
 
   for (const detection of sorted) {
-    const duplicateIndex = unique.findIndex((kept) =>
-      boxesAreDuplicate(kept.bbox, detection.bbox)
-    );
+    const duplicateIndex = unique.findIndex((kept) => {
+      const sameVerifiedPose =
+        kept.poseGroupId != null &&
+        detection.poseGroupId != null &&
+        kept.poseGroupId === detection.poseGroupId;
+      return sameVerifiedPose || boxesAreDuplicate(kept.bbox, detection.bbox);
+    });
     if (duplicateIndex === -1) unique.push({ ...detection, bbox: [...detection.bbox] });
     else unique[duplicateIndex] = preferredDetection(unique[duplicateIndex], detection);
   }
@@ -134,11 +139,13 @@ export function selectVerifiedPeople(
 ) {
   return detections.flatMap((detection) => {
     let bestPoseQuality = 0;
+    let bestPose = null;
     for (const pose of poses) {
-      bestPoseQuality = Math.max(
-        bestPoseQuality,
-        matchQuality(detection, pose),
-      );
+      const quality = matchQuality(detection, pose);
+      if (quality > bestPoseQuality) {
+        bestPoseQuality = quality;
+        bestPose = pose;
+      }
     }
 
     const verifiedByPose = bestPoseQuality >= 1.05;
@@ -147,6 +154,7 @@ export function selectVerifiedPeople(
       ...detection,
       bbox: [...detection.bbox],
       verifiedByPose,
+      poseGroupId: verifiedByPose ? bestPose?.poseGroupId ?? null : null,
     }];
   });
 }

@@ -23,7 +23,21 @@ const fullScan = { bbox: [70, 90, 170, 400], score: 0.72, fromFullScan: true };
 const tileScan = { bbox: [75, 95, 165, 395], score: 0.91, fromFullScan: false };
 assert.equal(consolidateDetections([fullScan, tileScan]).length, 1);
 
-const fakePose = { bbox: [400, 100, 180, 400], score: 0.99 };
+// Four overlapping tile scans can see the head/torso/legs of one person as
+// separate boxes. A shared full-frame pose identity must collapse all four.
+const tileFragments = [
+  { bbox: [142, 0, 240, 286], score: 0.9, poseGroupId: "pose-1" },
+  { bbox: [280, 8, 235, 273], score: 0.6, poseGroupId: "pose-1" },
+  { bbox: [126, 207, 252, 289], score: 0.71, poseGroupId: "pose-1" },
+  { bbox: [280, 207, 260, 289], score: 0.73, poseGroupId: "pose-1" },
+];
+assert.equal(consolidateDetections(tileFragments).length, 1);
+
+const fakePose = {
+  bbox: [400, 100, 180, 400],
+  score: 0.99,
+  poseGroupId: "pose-test",
+};
 assert.equal(
   selectVerifiedPeople([], [fakePose], 0.56, () => 5).length,
   0,
@@ -38,6 +52,16 @@ assert.equal(
   ).length,
   1,
   "a weak detector result may be rescued by a matching human pose",
+);
+assert.equal(
+  selectVerifiedPeople(
+    [{ bbox: [100, 100, 100, 260], score: 0.4 }],
+    [fakePose],
+    0.56,
+    () => 2,
+  )[0].poseGroupId,
+  "pose-test",
+  "a verified detector result must inherit its full-frame pose identity",
 );
 assert.equal(
   selectVerifiedPeople(
